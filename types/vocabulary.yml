@@ -1,0 +1,188 @@
+# Parent types for the three systems nearly every business runs: where it sells (CRM),
+# where it helps (support) and where it gets paid (billing). Nothing here fetches anything.
+# A realm over a real product makes its own types CHILDREN of these:
+#
+#   - name: ChatwootConversation
+#     parents: [SupportCase]
+#
+# and from then on a ChatwootConversation IS a SupportCase — the label is on the node, and
+# the properties below are its properties. A view written against SupportCase never learns
+# which helpdesk answered it. `MATCH (c:Chatwoot:SupportCase)` still asks one product only.
+#
+# THE CONTRACT A CHILD SIGNS. Inheriting the names is not enough; a child must also mean
+# the same thing by them, or a view that reads the parent gets confident nonsense:
+#
+#   accountKey   the customer's registrable domain, lower case: "acmecorp.com". It is the
+#                one identifier every product can hold and none invented, and it is the
+#                ONLY thing that joins a CRM's account to a helpdesk's case. A child that
+#                cannot produce one for a record leaves it empty — never a name, never an id.
+#   money        major units (dollars, not cents) as a number, with `currency` beside it as
+#                an ISO 4217 code. A child whose source speaks cents divides.
+#   dates        ISO text, YYYY-MM-DD, and they are BUSINESS dates: when the customer opened
+#                the case, not when some import created the row. Where a source holds both,
+#                the child maps the business one.
+#   enumerations exactly the words listed, lower case. A source with more states than these
+#                folds them in (a snoozed conversation is `pending`); the source's own word
+#                can travel in a property of the child's own.
+#   sourceUrl    a link that opens THIS record in the product it lives in. It is what lets
+#                an app that has never heard of the product send the user back to it.
+#
+# No type here has an identity. Identity belongs to the child, because only the product
+# knows what makes its records unique — and two products' ids must never be compared.
+#
+# No `examples:` either, deliberately. The spec's rule is that a steer follows a pinned
+# defect, never a hunch, and nothing has been asked of these types yet.
+
+- name: CustomerAccount
+  userAnchor: false
+  description: >-
+    A company the business sells to or hopes to, as its CRM knows it. The CRM is the record
+    of who the accounts ARE; support and billing each know some of the same companies by
+    other means, and a company billing knows that the CRM does not is a finding, not an error.
+  properties:
+    accountKey: "The company's registrable domain, lower case. The join key to everything else."
+    name: "The company's name as the CRM holds it."
+    website: "The company's website URL."
+    industry: "Industry, in the CRM's own words."
+    relationship: "customer, prospect or other — whether they pay us yet."
+    ownerName: "The person on our side who owns the relationship."
+    sourceUrl: "Opens this account in the CRM."
+
+- name: AccountContact
+  userAnchor: false
+  description: >-
+    A person at a customer account, as the CRM knows them. The same person may file support
+    cases under the same email address; email is how the two are recognized as one.
+  properties:
+    email: "Email address, lower case. How a contact is matched to a support requester."
+    name: "Full name."
+    jobTitle: "Job title."
+    accountKey: "The account this person belongs to."
+    sourceUrl: "Opens this contact in the CRM."
+
+- name: AccountNote
+  userAnchor: false
+  description: >-
+    Something our own people wrote down about an account, a contact or an opportunity: a
+    call summary, a worry, a plan. Notes are what the CRM BELIEVES, which is why they matter:
+    a problem support can see and no note mentions is a problem sales does not know about.
+  properties:
+    accountKey: "The account the note is about, whichever record it was written on."
+    about: "account, contact or opportunity — what the note was attached to."
+    body: "The note, as plain text."
+    author: "Who wrote it."
+    writtenOn: "The day it was written."
+    sourceUrl: "Opens the record the note is on."
+
+- name: Opportunity
+  userAnchor: false
+  description: >-
+    A deal in the pipeline, open or decided. amount x probability is the weighted pipeline;
+    both are the CRM's own figures and are never recomputed here.
+  properties:
+    accountKey: "The account the deal is with."
+    title: "The deal's name."
+    stage: "The pipeline step, in the CRM's own words. Steps differ between businesses; status does not."
+    status: "open, won or lost."
+    amount: { type: float, description: "Deal value, in major units of `currency`." }
+    currency: "ISO 4217 code."
+    probability: { type: float, description: "0 to 1. A fraction, not a percentage." }
+    closeOn: "Expected close date while open; the day it was decided once won or lost."
+    ownerName: "The salesperson who owns the deal."
+    sourceUrl: "Opens this deal in the CRM."
+
+- name: SupportCase
+  userAnchor: false
+  description: >-
+    One problem, question or request a customer brought to support — a ticket in a ticketing
+    product, a conversation in an inbox product. It is a case when a customer is waiting on
+    it; internal engineering work with no customer behind it is not one.
+  properties:
+    accountKey: "The requester's company, from their email domain."
+    subject: "One line saying what the case is about."
+    status: "open, pending or resolved. Pending means waiting on the customer, not on us."
+    priority: "urgent, high, medium, low or none."
+    kind: "bug, feature-request, question, documentation or enhancement, where the helpdesk records it."
+    requesterEmail: "Who asked. Matches an AccountContact's email when the CRM knows them."
+    requesterName: "Their name as support knows it."
+    openedOn: "The day the customer raised it."
+    updatedOn: "The day anything last happened on it."
+    closedOn: "The day it was resolved; empty while open."
+    replyCount: { type: int, description: "How much back-and-forth there has been. A long thread on an open case is a signal in itself." }
+    sourceUrl: "Opens this case in the helpdesk."
+
+- name: SupportMessage
+  userAnchor: false
+  description: >-
+    One message in a case's thread. Who said it matters more than anything else about it: a
+    customer's words are evidence of how they feel, an agent's are not.
+  properties:
+    body: "The message, as plain text."
+    fromCustomer: { type: boolean, description: "True when the customer wrote it; false for our own staff." }
+    internal: { type: boolean, description: "True for a private note between staff that the customer never saw." }
+    sentOn: "The day it was sent."
+
+- name: BillingCustomer
+  userAnchor: false
+  description: >-
+    A company as the billing system knows it: somebody we invoice. Usually also a
+    CustomerAccount, joined on accountKey — and when it is not, that is worth knowing: a
+    paying or a delinquent customer the CRM has never heard of.
+  properties:
+    accountKey: "The company's registrable domain, from its billing email or website."
+    name: "The name invoices are made out to."
+    email: "Where invoices are sent."
+    currency: "The ISO 4217 currency this customer is billed in."
+    customerSince: "The day billing first knew them."
+    sourceUrl: "Opens this customer in the billing system."
+
+- name: BillingSubscription
+  userAnchor: false
+  description: >-
+    Something a customer pays for on a schedule. The sum of a customer's active
+    subscriptions, annualized, is what the business stands to lose if they leave.
+  properties:
+    accountKey: "The customer's account."
+    product: "What is subscribed to."
+    status: "active, past_due or canceled."
+    amount: { type: float, description: "Price per `interval`, in major units of `currency`." }
+    currency: "ISO 4217 code."
+    interval: "month or year."
+    startedOn: "The day the subscription began."
+    periodEndsOn: "The day the current paid period ends — the next renewal."
+    sourceUrl: "Opens this subscription in the billing system."
+
+- name: BillingInvoice
+  userAnchor: false
+  description: >-
+    A bill sent to a customer. paymentStatus is the fact every billing product records and
+    the one to reason from: how many times a card was tried is detail some products keep
+    (see PaymentAttempt) and others do not.
+  properties:
+    accountKey: "The customer's account."
+    number: "The invoice number printed on it."
+    amount: { type: float, description: "Total billed, in major units of `currency`." }
+    amountPaid: { type: float, description: "How much of it has been received." }
+    currency: "ISO 4217 code."
+    paymentStatus: "pending, succeeded or failed. Failed means we tried to collect and could not."
+    overdue: { type: boolean, description: "True once the due date has passed with the invoice unpaid." }
+    disputeLost: { type: boolean, description: "True when the customer disputed the payment with their bank and won." }
+    issuedOn: "The day it was issued."
+    dueOn: "The day payment is due."
+    paidOn: "The day it was paid; empty while unpaid."
+    sourceUrl: "Opens this invoice in the billing system."
+
+- name: PaymentAttempt
+  userAnchor: false
+  description: >-
+    One try at collecting an invoice: a card charge, a bank debit. A billing product connected
+    to a payment processor has these; one that is not may have none at all, so a rule about an
+    account's health should stand on BillingInvoice.paymentStatus and treat attempts as detail.
+  properties:
+    accountKey: "The customer's account."
+    invoiceNumber: "The invoice this was an attempt to collect."
+    amount: { type: float, description: "Amount attempted, in major units of `currency`." }
+    currency: "ISO 4217 code."
+    status: "succeeded or failed."
+    failureCode: "Why it failed, in the processor's own words; empty on success."
+    attemptedOn: "The day it was tried."

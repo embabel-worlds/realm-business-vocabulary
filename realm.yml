@@ -1,0 +1,18 @@
+name: business-vocabulary
+description: >-
+  The words a business uses for its customers, whatever product it keeps them in. Parent
+  types only — a customer account, a note about it, an opportunity, a support case, an
+  invoice — with no producers, no views and no vendor. A realm over a CRM, a helpdesk or a
+  billing system declares its own types as children of these, so a question asked about
+  SupportCase is answered by whichever helpdesk is installed, and keeps being answered when
+  it is replaced.
+version: 0.1.0
+# Not ready to be offered: the realms that make this one useful are still being built.
+maturity: experimental
+author: Rod Johnson
+realmLabel: Business
+tags:
+  - vocabulary
+  - crm
+  - support
+  - billing
