@@ -67,6 +67,18 @@
     ownerName: "The person on our side who owns the relationship."
     sourceUrl: "Opens this account in the CRM."
 
+- name: CrmAccount
+  userAnchor: false
+  description: >-
+    A company as the CRM knows it: its RECORD of a customer account, the way a BillingCustomer
+    is billing's. The account is the identity (one node, whoever knows it); this is one
+    system's entry for it, reached from the account by TRACKED_AS, and it is where the CRM's
+    own things hang: its opportunities, its contacts, what its people wrote down.
+  properties:
+    name: "The company's name as the CRM holds it."
+    website: "The company's website, as the CRM holds it."
+    sourceUrl: "Opens this account in the CRM."
+
 - name: AccountContact
   userAnchor: false
   description: >-
