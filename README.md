@@ -50,9 +50,12 @@ own joins, and uses these names so that a traversal reads the same over any prod
 
 | From | Relationship | To |
 |---|---|---|
-| `CustomerAccount` | `HAS_ACCOUNT_CONTACT` | `AccountContact` |
-| `CustomerAccount` | `HAS_NOTE` | `AccountNote` |
-| `CustomerAccount` | `HAS_OPPORTUNITY` | `Opportunity` |
+| `CustomerAccount` | `TRACKED_AS` | `CrmAccount` |
+| `CrmAccount` | `HAS_ACCOUNT_CONTACT` | `AccountContact` |
+| `CrmAccount` | `HAS_OPPORTUNITY` | `Opportunity` |
+| `CrmAccount` | `HAS_NOTE` | `AccountNote` |
+| `AccountContact` | `HAS_NOTE` | `AccountNote` |
+| `Opportunity` | `HAS_NOTE` | `AccountNote` |
 | `CustomerAccount` | `HAS_CASE` | `SupportCase` |
 | `SupportCase` | `HAS_MESSAGE` | `SupportMessage` |
 | `CustomerAccount` | `BILLED_AS` | `BillingCustomer` |

@@ -27,8 +27,21 @@
 #   sourceUrl    a link that opens THIS record in the product it lives in. It is what lets
 #                an app that has never heard of the product send the user back to it.
 #
-# No type here has an identity. Identity belongs to the child, because only the product
-# knows what makes its records unique — and two products' ids must never be compared.
+# RECORDS AND IDENTITIES ARE DIFFERENT THINGS, and this file has both.
+#
+# Everything a product holds a RECORD of is a parent type. A case is a case: two helpdesks'
+# tickets are two tickets, and `parents: [SupportCase]` is how each says what it is. A parent
+# has no identity of its own, because only the product knows what makes its records unique —
+# and two products' ids must never be compared.
+#
+# CustomerAccount is the exception, because it is not a record. A CRM's customer, a helpdesk's
+# company and a billing system's account for one business are three records ABOUT one thing,
+# and every question this vocabulary exists for ("open cases AND an overdue invoice") needs
+# them to be one node. So it is a SPINE: a product realm does not take it as a parent — that
+# would make three accounts per company with nothing joining them, and the host refuses it —
+# it puts `hub: CustomerAccount` on whichever property carries the company's domain or
+# website, in whatever shape. The `normalize` below is the single definition of "the same
+# account"; no product realm normalizes on its own side.
 #
 # No `examples:` either, deliberately. The spec's rule is that a steer follows a pinned
 # defect, never a hunch, and nothing has been asked of these types yet.
@@ -39,6 +52,12 @@
     A company the business sells to or hopes to, as its CRM knows it. The CRM is the record
     of who the accounts ARE; support and billing each know some of the same companies by
     other means, and a company billing knows that the CRM does not is a finding, not an error.
+  spine:
+    key: accountKey
+    identityProperties: [accountKey, website]
+    normalize: [lowercase, extractDomain, stripWww, stripTrailingDot]
+    require: hasDot
+    exclude: freemail
   properties:
     accountKey: "The company's registrable domain, lower case. The join key to everything else."
     name: "The company's name as the CRM holds it."
@@ -46,6 +65,18 @@
     industry: "Industry, in the CRM's own words."
     relationship: "customer, prospect or other — whether they pay us yet."
     ownerName: "The person on our side who owns the relationship."
+    sourceUrl: "Opens this account in the CRM."
+
+- name: CrmAccount
+  userAnchor: false
+  description: >-
+    A company as the CRM knows it: its RECORD of a customer account, the way a BillingCustomer
+    is billing's. The account is the identity (one node, whoever knows it); this is one
+    system's entry for it, reached from the account by TRACKED_AS, and it is where the CRM's
+    own things hang: its opportunities, its contacts, what its people wrote down.
+  properties:
+    name: "The company's name as the CRM holds it."
+    website: "The company's website, as the CRM holds it."
     sourceUrl: "Opens this account in the CRM."
 
 - name: AccountContact
