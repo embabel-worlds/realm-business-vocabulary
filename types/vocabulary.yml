@@ -43,6 +43,12 @@
 # website, in whatever shape. The `normalize` below is the single definition of "the same
 # account"; no product realm normalizes on its own side.
 #
+# `hub:` makes the account and keys it; it fills in nothing else. The account's other
+# properties are copied from a record with `metadata: { canonical: <property> }` on the
+# record's field, and only the CRM's realm should do it, because the account is what the CRM
+# knows of it. So an account only support or billing has heard of has a key and perhaps a
+# name, and the rest empty — which is the finding, not a gap to paper over.
+#
 # No `examples:` either, deliberately. The spec's rule is that a steer follows a pinned
 # defect, never a hunch, and nothing has been asked of these types yet.
 
@@ -61,11 +67,11 @@
   properties:
     accountKey: "The company's registrable domain, lower case. The join key to everything else."
     name: "The company's name as the CRM holds it."
-    website: "The company's website URL."
-    industry: "Industry, in the CRM's own words."
-    relationship: "customer, prospect or other — whether they pay us yet."
-    ownerName: "The person on our side who owns the relationship."
-    sourceUrl: "Opens this account in the CRM."
+    website: "The company's website URL, from the CRM. Empty when no CRM record keys the account."
+    industry: "Industry, in the CRM's own words. Empty when no CRM record keys the account."
+    relationship: "customer, prospect or other — whether they pay us yet, as the CRM records it. Empty when no CRM record keys the account."
+    ownerName: "The person on our side who owns the relationship, by name, from the CRM. Empty when no CRM record keys the account."
+    sourceUrl: "Opens this account in the CRM. Empty when no CRM record keys the account."
 
 - name: CrmAccount
   userAnchor: false
