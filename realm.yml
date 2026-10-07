@@ -11,6 +11,7 @@ version: 0.1.0
 maturity: experimental
 author: Rod Johnson
 realmLabel: Business
+category: platform
 tags:
   - vocabulary
   - crm
