@@ -128,6 +128,28 @@
     ownerName: "The salesperson who owns the deal."
     sourceUrl: "Opens this deal in the CRM."
 
+- name: FollowUp
+  userAnchor: false
+  description: >-
+    Something one of our people has scheduled to do about a customer: a call to make, an email to
+    send, a to-do with a date. An account with a follow-up on it is one somebody has picked up; an
+    account in trouble with none is one nobody has. Reached from what it is about by FOLLOW_UP_ON.
+  properties:
+    title: "What is to be done, in the words of whoever scheduled it."
+    dueOn: "The day it is due."
+    ownerName: "Who on our side is to do it."
+    sourceUrl: "Opens this follow-up in the CRM."
+
+- name: Meeting
+  userAnchor: false
+  description: >-
+    A meeting on our calendar with people at a customer: a call, a review, a visit. Reached by
+    MEETING_WITH to the companies and people attending.
+  properties:
+    title: "The meeting's subject."
+    startsOn: "The day it starts."
+    sourceUrl: "Opens this meeting in the calendar it is kept in."
+
 - name: SupportCase
   userAnchor: false
   description: >-
@@ -146,6 +168,7 @@
     updatedOn: "The day anything last happened on it."
     closedOn: "The day it was resolved; empty while open."
     replyCount: { type: int, description: "How much back-and-forth there has been. A long thread on an open case is a signal in itself." }
+    tags: { type: any, description: "The helpdesk's own tags or labels on the case, as a list of words. A desk that files cases by product area does it here, so two cases sharing a tag are about the same thing." }
     sourceUrl: "Opens this case in the helpdesk."
 
 - name: SupportMessage

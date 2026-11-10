@@ -56,6 +56,8 @@ own joins, and uses these names so that a traversal reads the same over any prod
 | `CrmAccount` | `HAS_NOTE` | `AccountNote` |
 | `AccountContact` | `HAS_NOTE` | `AccountNote` |
 | `Opportunity` | `HAS_NOTE` | `AccountNote` |
+| `FollowUp` | `FOLLOW_UP_ON` | `CrmAccount` |
+| `Meeting` | `MEETING_WITH` | `CrmAccount` |
 | `CustomerAccount` | `HAS_CASE` | `SupportCase` |
 | `SupportCase` | `HAS_MESSAGE` | `SupportMessage` |
 | `CustomerAccount` | `BILLED_AS` | `BillingCustomer` |
@@ -66,6 +68,32 @@ own joins, and uses these names so that a traversal reads the same over any prod
 `HAS_ACCOUNT_CONTACT` and not `HAS_CONTACT`: the host already writes `HAS_CONTACT` when it
 resolves a record onto its Person spine, and a vocabulary that reuses a host relationship
 name for something else has made every traversal of it ambiguous.
+
+## Reading a whole system
+
+A question about the book — every open case, everything owed — has to start somewhere, and a
+consumer that names no product cannot write a product's door. So a child realm also agrees:
+
+- **A bare parent label reads the whole system.** `MATCH (c:SupportCase)` must reach every
+  case. A child gets this from a book door whose default identity is its join key
+  (`status: { metadata: { identity: "true", default: "all" } }` on the door, `keyField: status`
+  on the join). Where a child has more than one such door onto the same type, the engine will
+  not choose between them; mark the one that means what the parent means with
+  `implicitDoor: true` (for `CrmAccount`, every company the CRM knows — prospects included).
+- **A spine edge rides that sweep.** `TRACKED_AS`, `HAS_CASE` and `BILLED_AS` ask the product
+  about one account at a time, which is refused above a few hundred accounts. Declared
+  `ridesHub: true`, they are answered instead from records the query has already swept, matched
+  on the spine's key. That is sound only if the sweep is COMPLETE for the edge: the bare-label
+  door above must reach every record the edge would. A narrower door (customers who have bought,
+  open cases only) ridden by a wider edge loses the rest without a word.
+
+So the shape a consumer writes for an account-level question over the book is: sweep by the
+bare label, then join through the spine.
+
+```cypher
+MATCH (k:CrmAccount)                                     // the whole CRM, one door
+MATCH (a:CustomerAccount)-[:TRACKED_AS]->(k)             // rides the sweep, no call per account
+```
 
 ## Depending on it
 
