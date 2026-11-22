@@ -232,6 +232,18 @@
     paidOn: "The day it was paid; empty while unpaid."
     sourceUrl: "Opens this invoice in the billing system."
 
+- name: BillingPlan
+  userAnchor: false
+  description: >-
+    What a customer can be put on: a named price with a billing interval. A subscription is ON a
+    plan; the plan is where its name and how long one billing period lasts are kept.
+  properties:
+    code: "The plan's code, as subscriptions name it."
+    name: "The plan's name, as people say it."
+    interval: "How often it bills: monthly, quarterly, yearly, weekly, in the billing product's own word."
+    amount: { type: float, description: "Base price per billing period, in major units of `currency`." }
+    currency: "ISO 4217 code."
+
 - name: PaymentAttempt
   userAnchor: false
   description: >-
