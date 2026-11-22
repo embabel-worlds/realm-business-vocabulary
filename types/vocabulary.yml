@@ -221,8 +221,8 @@
   properties:
     accountKey: "The customer's account."
     number: "The invoice number printed on it."
-    amount: { type: float, description: "Total billed, in major units of `currency`." }
-    amountPaid: { type: float, description: "How much of it has been received." }
+    amount: { type: float, description: "Total billed, in major units of `currency`. Invoices can be in different currencies: sum amounts per currency (group by `currency`), never across them." }
+    amountPaid: { type: float, description: "How much of it has been received, in `currency`." }
     currency: "ISO 4217 code."
     paymentStatus: "pending, succeeded or failed. Failed means we tried to collect and could not."
     overdue: { type: boolean, description: "True once the due date has passed with the invoice unpaid." }
