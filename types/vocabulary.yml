@@ -209,7 +209,7 @@
     currency: "ISO 4217 code."
     interval: "month or year."
     startedOn: "The day the subscription began."
-    periodEndsOn: "The day the current paid period ends — the next renewal."
+    periodEndsOn: "The day the current paid period ends — the next renewal. It renews every `interval`, not once: its renewals in a span of time are every period end inside it, not only this one."
     sourceUrl: "Opens this subscription in the billing system."
 
 - name: BillingInvoice
