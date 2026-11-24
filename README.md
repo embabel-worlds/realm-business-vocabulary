@@ -35,13 +35,61 @@ thing. It is stated in full at the top of `types/vocabulary.yml`; in short:
 | | |
 |---|---|
 | `accountKey` | the customer's registrable domain, lower case. The only cross-product join key. Empty when unknown; never a name or an id. |
-| money | major units as a number, `currency` beside it |
+| money | major units as a number, `currency` beside it; summed per currency, never across |
 | dates | ISO `YYYY-MM-DD`, and the BUSINESS date, not the row's creation time |
 | enumerations | exactly the listed words; a source with more states folds them in |
 | `sourceUrl` | opens this record in its own product |
 
 No parent has an identity. Identity is the child's, because only the product knows what
 makes its records unique, and two products' ids must never be compared.
+
+## One company, one account
+
+`CustomerAccount` is the one thing here that is not a record. A CRM's company, a helpdesk's
+requester company and a billing system's customer for one business are three records ABOUT one
+company, and the account is that company: one node, keyed by `accountKey`, its registrable domain
+in lower case. Each product realm puts `hub: CustomerAccount` on whichever field holds the
+company's domain or website, and the spine normalizes every value one way
+(`https://www.Acme.com/about`, `acme.com` and `billing@acme.com` are all `acme.com`), so no
+product realm normalizes on its own side.
+
+The key is the domain and never the name. **Companies with near names are distinct accounts**:
+`Acme`, `Acme AB` and `Acme Group` each have a domain of their own, and each is its own account
+with its own cases, invoices and deals. A group's parent and its subsidiaries are separate accounts
+too; the CRM's hierarchy between their records is `SUBSIDIARY_OF` / `HAS_SUBSIDIARY`. So a question
+about a company names it by `accountKey`, or by its name compared exactly — `a.name = 'Acme AB'`,
+never `CONTAINS 'Acme'`, which reads three companies as one.
+
+A company is an account once some system's realm has read a record keying it. An account that
+billing or support knows and the CRM does not has a key and perhaps a name, and the CRM's fields
+empty: that is a finding, not a gap.
+
+## Money, currency and dates
+
+| | |
+|---|---|
+| amounts | major units (dollars, not cents) of the `currency` beside them |
+| currency | ISO 4217. **Sum per currency, never across**: group by `currency`; a total that adds USD to GBP is not a number of anything |
+| subscription amounts | per `interval`; a monthly and a yearly amount are not added either |
+| `Opportunity.amount` | unweighted; `amount * probability` is the weighted pipeline |
+| owed | `BillingInvoice.amount - amountPaid`; unpaid is `paymentStatus <> 'succeeded'`, which includes invoices not yet due |
+
+| Date | Means |
+|---|---|
+| `SupportCase.openedOn` / `updatedOn` / `closedOn` | the customer raised it / anything last happened / it was resolved (empty while open or pending) |
+| `Opportunity.closeOn` | the expected close while open; the day it was won or lost once decided |
+| `BillingInvoice.issuedOn` / `dueOn` / `paidOn` | issued / payment due / paid (empty while unpaid) |
+| `BillingSubscription.startedOn` / `periodEndsOn` | began / the current paid period ends, which is the next renewal |
+| `BillingCustomer.customerSince` | billing first knew them |
+| `AccountNote.writtenOn`, `FollowUp.dueOn`, `Meeting.startsOn`, `SupportMessage.sentOn`, `PaymentAttempt.attemptedOn` | written / due / starts / sent / tried |
+
+Dates are `YYYY-MM-DD`. A source that only has a full ISO timestamp may pass it through; its first
+ten characters are the day, so compare on `substring(x, 0, 10)`.
+
+## Worked examples
+
+In [EXAMPLES.md](EXAMPLES.md): one account's cases, debt and deals by its domain, and a company by
+its exact name. A question about the whole book starts from a sweep instead; see "Reading a whole system" below.
 
 ## Relationship names
 
@@ -58,6 +106,8 @@ own joins, and uses these names so that a traversal reads the same over any prod
 | `Opportunity` | `HAS_NOTE` | `AccountNote` |
 | `FollowUp` | `FOLLOW_UP_ON` | `CrmAccount` |
 | `Meeting` | `MEETING_WITH` | `CrmAccount` |
+| `CrmAccount` | `SUBSIDIARY_OF` | `CrmAccount` |
+| `CrmAccount` | `HAS_SUBSIDIARY` | `CrmAccount` |
 | `CustomerAccount` | `HAS_CASE` | `SupportCase` |
 | `SupportCase` | `HAS_MESSAGE` | `SupportMessage` |
 | `CustomerAccount` | `BILLED_AS` | `BillingCustomer` |
@@ -68,6 +118,18 @@ own joins, and uses these names so that a traversal reads the same over any prod
 `HAS_ACCOUNT_CONTACT` and not `HAS_CONTACT`: the host already writes `HAS_CONTACT` when it
 resolves a record onto its Person spine, and a vocabulary that reuses a host relationship
 name for something else has made every traversal of it ambiguous.
+
+`SUBSIDIARY_OF` and `HAS_SUBSIDIARY` are the company hierarchy as the CRM records it: the
+parent company a company belongs to, and the companies filed under it. Every CRM keeps one —
+Odoo's parent company on a company record, Salesforce's Parent Account, HubSpot's parent
+company association — and a realm maps its own onto these two names, so "this company and its
+subsidiaries" is `(k:CrmAccount)-[:HAS_SUBSIDIARY*1..4]->(s:CrmAccount)` whichever CRM answers.
+Two names rather than one edge walked both ways, as FIBO does for control: a walk UP is one
+parent per hop and never asks, at each company it passes, for all of that company's siblings.
+They join CRM records, not `CustomerAccount`s: a group's companies are separate accounts with
+domains of their own, and each subsidiary reaches its own account the usual way, by its website.
+The edge joins companies only. A person's link to the company they work at is
+`HAS_ACCOUNT_CONTACT`, even where the CRM stores both in one field.
 
 ## Reading a whole system
 
