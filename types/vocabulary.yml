@@ -120,14 +120,14 @@
   properties:
     email: "Email address, lower case. How a contact is matched to a support requester."
     name: "Full name."
-    jobTitle: "Job title."
+    jobTitle: "Their job title as the CRM holds it, free text ('VP Finance', 'IT Director'); empty when the CRM has none."
     accountKey: "The domain of the company this person belongs to; the CustomerAccount's key."
     sourceUrl: "Opens this contact in the CRM."
 
 - name: AccountNote
   userAnchor: false
   description: >-
-    Something our own people wrote in the CRM about a company, a person or a deal, reached by
+    One note our own people wrote in the CRM about a company, a person or a deal, reached by
     HAS_NOTE from a CrmAccount, an AccountContact or an Opportunity. writtenOn is the day it was
     written (YYYY-MM-DD); body is plain text. Notes are what sales BELIEVES about a customer.
     That is why they matter: a problem support can see and no note mentions is a problem sales
@@ -154,7 +154,7 @@
   properties:
     accountKey: "The domain of the account the deal is with."
     title: "The deal's name."
-    stage: "The pipeline step, in the CRM's own words. Steps differ between businesses; status does not."
+    stage: "The pipeline step in the CRM's own words, e.g. 'New', 'Qualified', 'Proposition'; not a fixed list, it differs between businesses. Ask status for open, won or lost."
     status: "open, won or lost."
     amount: { type: float, description: "Deal value, in major units of `currency` (dollars, not cents). Unweighted: multiply by probability for the weighted figure. Sum per currency, never across." }
     currency: "ISO 4217 code of `amount`."
@@ -245,7 +245,7 @@
 - name: BillingSubscription
   userAnchor: false
   description: >-
-    Something a billing customer pays for on a schedule, reached by HAS_SUBSCRIPTION from a
+    One thing a billing customer pays for on a schedule, reached by HAS_SUBSCRIPTION from a
     BillingCustomer. amount is the price per interval in major units of `currency`: total per
     currency, never across, and never add a monthly to a yearly amount. periodEndsOn is the next
     renewal.
@@ -315,6 +315,6 @@
     invoiceNumber: "The invoice this was an attempt to collect."
     amount: { type: float, description: "Amount attempted, in major units of `currency`." }
     currency: "ISO 4217 code of `amount`."
-    status: "succeeded or failed."
+    status: { values: [succeeded, failed], description: "succeeded or failed, lower case." }
     failureCode: "Why it failed, in the processor's own words; empty on success."
     attemptedOn: "The day it was tried, YYYY-MM-DD."
