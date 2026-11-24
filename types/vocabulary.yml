@@ -29,6 +29,11 @@
 #   sourceUrl    a link that opens THIS record in the product it lives in. It is what lets
 #                an app that has never heard of the product send the user back to it.
 #
+# The money and date rules are also DECLARED, not only written down: each amount carries
+# `currency: currency` (its row's ISO code is in `currency`) and each date its `format:`, and
+# every model writing a query sees them under the type. A child that redeclares one of these
+# properties declares the measure again, in its source's own terms (`unit: cents` and all).
+#
 # RECORDS AND IDENTITIES ARE DIFFERENT THINGS, and this file has both.
 #
 # Everything a product holds a RECORD of is a parent type. A case is a case: two helpdesks'
@@ -138,7 +143,7 @@
     about: "account, contact or opportunity — what the note was attached to."
     body: "The note, as plain text."
     author: "Who wrote it."
-    writtenOn: "The day it was written, YYYY-MM-DD."
+    writtenOn: { format: yyyy-MM-dd, description: "The day it was written." }
     sourceUrl: "Opens the record the note is on."
 
 - name: Opportunity
@@ -156,10 +161,10 @@
     title: "The deal's name."
     stage: "The pipeline step in the CRM's own words, e.g. 'New', 'Qualified', 'Proposition'; not a fixed list, it differs between businesses. Ask status for open, won or lost."
     status: "open, won or lost."
-    amount: { type: float, description: "Deal value, in major units of `currency` (dollars, not cents). Unweighted: multiply by probability for the weighted figure. Sum per currency, never across." }
+    amount: { type: float, currency: currency, description: "Deal value in major units (dollars, not cents). Unweighted: multiply by probability for the weighted figure. Sum per currency, never across." }
     currency: "ISO 4217 code of `amount`."
-    probability: { type: float, description: "0 to 1. A fraction, not a percentage." }
-    closeOn: "YYYY-MM-DD. The expected close date while the deal is open; the day it was won or lost once decided."
+    probability: { type: float, unit: fraction, description: "0 to 1: 0.65 is 65%. A fraction, not a percentage." }
+    closeOn: { format: yyyy-MM-dd, description: "The expected close date while the deal is open; the day it was won or lost once decided." }
     ownerName: "The salesperson who owns the deal."
     sourceUrl: "Opens this deal in the CRM."
 
@@ -172,7 +177,7 @@
     nobody has.
   properties:
     title: "What is to be done, in the words of whoever scheduled it."
-    dueOn: "The day it is due, YYYY-MM-DD."
+    dueOn: { format: yyyy-MM-dd, description: "The day it is due." }
     ownerName: "Who on our side is to do it."
     sourceUrl: "Opens this follow-up in the CRM."
 
@@ -184,7 +189,7 @@
     A meeting with only a person at a company reaches that person's record, not the company's.
   properties:
     title: "The meeting's subject."
-    startsOn: "The day it starts, YYYY-MM-DD."
+    startsOn: { format: yyyy-MM-dd, description: "The day it starts." }
     sourceUrl: "Opens this meeting in the calendar it is kept in."
 
 - name: SupportCase
@@ -208,9 +213,9 @@
     kind: "bug, feature-request, question, documentation or enhancement, where the helpdesk records it."
     requesterEmail: "Who asked. Matches an AccountContact's email when the CRM knows them."
     requesterName: "Their name as support knows it."
-    openedOn: "The day the customer raised it, YYYY-MM-DD."
-    updatedOn: "The day anything last happened on it, YYYY-MM-DD."
-    closedOn: "The day it was resolved, YYYY-MM-DD; empty while open or pending."
+    openedOn: { format: yyyy-MM-dd, description: "The day the customer raised it." }
+    updatedOn: { format: yyyy-MM-dd, description: "The day anything last happened on it." }
+    closedOn: { format: yyyy-MM-dd, description: "The day it was resolved; empty while open or pending." }
     replyCount: { type: int, description: "How much back-and-forth there has been. A long thread on an open case is a signal in itself." }
     tags: { type: any, description: "The helpdesk's own tags or labels on the case, as a list of words. A desk that files cases by product area does it here, so two cases sharing a tag are about the same thing." }
     sourceUrl: "Opens this case in the helpdesk."
@@ -225,7 +230,7 @@
     body: "The message, as plain text."
     fromCustomer: { type: boolean, description: "True when the customer wrote it; false for our own staff." }
     internal: { type: boolean, description: "True for a private note between staff that the customer never saw." }
-    sentOn: "The day it was sent, YYYY-MM-DD."
+    sentOn: { format: yyyy-MM-dd, description: "The day it was sent." }
 
 - name: BillingCustomer
   userAnchor: false
@@ -239,7 +244,7 @@
     name: "The name invoices are made out to."
     email: "Where invoices are sent."
     currency: "The ISO 4217 currency this customer is billed in."
-    customerSince: "The day billing first knew them: YYYY-MM-DD, or a full ISO timestamp whose first ten characters are the day."
+    customerSince: { format: "yyyy-MM-dd, or an ISO 8601 timestamp whose first ten characters are the day", description: "The day billing first knew them. Compare on substring(customerSince, 0, 10) for the day." }
     sourceUrl: "Opens this customer in the billing system."
 
 - name: BillingSubscription
@@ -256,11 +261,11 @@
     accountKey: "The domain of the customer's account."
     product: "What is subscribed to."
     status: "active, past_due or canceled."
-    amount: { type: float, description: "Price per `interval`, in major units of `currency`. Sum per currency (and per interval), never across." }
+    amount: { type: float, currency: currency, description: "Price per `interval`, in major units. Sum per currency (and per interval), never across." }
     currency: "ISO 4217 code of `amount`."
     interval: "month or year: how long one paid period is."
-    startedOn: "The day the subscription began: YYYY-MM-DD, or a full ISO timestamp whose first ten characters are the day."
-    periodEndsOn: "The day the current paid period ends — the next renewal (YYYY-MM-DD, or a timestamp whose first ten characters are the day). It renews every `interval`, not once: its renewals in a span of time are every period end inside it, not only this one."
+    startedOn: { format: "yyyy-MM-dd, or an ISO 8601 timestamp whose first ten characters are the day", description: "The day the subscription began." }
+    periodEndsOn: { format: "yyyy-MM-dd, or an ISO 8601 timestamp whose first ten characters are the day", description: "The day the current paid period ends — the next renewal. It renews every `interval`, not once: its renewals in a span of time are every period end inside it, not only this one." }
     sourceUrl: "Opens this subscription in the billing system."
 
 - name: BillingInvoice
@@ -278,15 +283,15 @@
   properties:
     accountKey: "The domain of the customer's account."
     number: "The invoice number printed on it."
-    amount: { type: float, description: "Total billed, in major units of `currency`. Invoices can be in different currencies: sum amounts per currency (group by `currency`), never across them." }
-    amountPaid: { type: float, description: "How much of it has been received, in major units of `currency`. amount - amountPaid is what is still owed." }
+    amount: { type: float, currency: currency, description: "Total billed, in major units. Invoices can be in different currencies: sum amounts per currency (group by `currency`), never across them." }
+    amountPaid: { type: float, currency: currency, description: "How much of it has been received, in major units. amount - amountPaid is what is still owed." }
     currency: "ISO 4217 code of the amounts."
     paymentStatus: "pending, succeeded or failed. Failed means we tried to collect and could not; pending includes invoices not yet due."
     overdue: { type: boolean, description: "True once the due date has passed with the invoice unpaid." }
     disputeLost: { type: boolean, description: "True when the customer disputed the payment with their bank and won." }
-    issuedOn: "The day it was issued, YYYY-MM-DD."
-    dueOn: "The day payment is due, YYYY-MM-DD."
-    paidOn: "The day it was paid, YYYY-MM-DD; empty while unpaid."
+    issuedOn: { format: yyyy-MM-dd, description: "The day it was issued." }
+    dueOn: { format: yyyy-MM-dd, description: "The day payment is due." }
+    paidOn: { format: yyyy-MM-dd, description: "The day it was paid; empty while unpaid." }
     sourceUrl: "Opens this invoice in the billing system."
 
 - name: BillingPlan
@@ -300,7 +305,7 @@
     code: "The plan's code, as subscriptions name it."
     name: "The plan's name, as people say it."
     interval: "How often it bills: monthly, quarterly, yearly, weekly, in the billing product's own word."
-    amount: { type: float, description: "Base price per billing period, in major units of `currency`." }
+    amount: { type: float, currency: currency, description: "Base price per billing period, in major units." }
     currency: "ISO 4217 code of `amount`."
 
 - name: PaymentAttempt
@@ -313,8 +318,8 @@
   properties:
     accountKey: "The domain of the customer's account."
     invoiceNumber: "The invoice this was an attempt to collect."
-    amount: { type: float, description: "Amount attempted, in major units of `currency`." }
+    amount: { type: float, currency: currency, description: "Amount attempted, in major units." }
     currency: "ISO 4217 code of `amount`."
     status: { values: [succeeded, failed], description: "succeeded or failed, lower case." }
     failureCode: "Why it failed, in the processor's own words; empty on success."
-    attemptedOn: "The day it was tried, YYYY-MM-DD."
+    attemptedOn: { format: yyyy-MM-dd, description: "The day it was tried." }
