@@ -20,7 +20,9 @@
 #                an ISO 4217 code. A child whose source speaks cents divides.
 #   dates        ISO text, YYYY-MM-DD, and they are BUSINESS dates: when the customer opened
 #                the case, not when some import created the row. Where a source holds both,
-#                the child maps the business one.
+#                the child maps the business one. A source that only gives a full timestamp
+#                may pass it through; the first ten characters are then the day, so a reader
+#                compares on `substring(x, 0, 10)` and loses nothing.
 #   enumerations exactly the words listed, lower case. A source with more states than these
 #                folds them in (a snoozed conversation is `pending`); the source's own word
 #                can travel in a property of the child's own.
@@ -49,15 +51,32 @@
 # knows of it. So an account only support or billing has heard of has a key and perhaps a
 # name, and the rest empty — which is the finding, not a gap to paper over.
 #
-# No `examples:` either, deliberately. The spec's rule is that a steer follows a pinned
-# defect, never a hunch, and nothing has been asked of these types yet.
+# WHERE THE GUIDANCE GOES. A model writing Cypher is shown the first 320 characters of a type's
+# description, cut at a sentence, and nothing after; so each description below opens with what a
+# writer must not get wrong — the key, the edge that reaches it, the units, which date means
+# what — and the explanation follows for a human reader. The worked queries at the end of a
+# description are for that reader too, and are checked by `embabel realm validate` like any view.
+#
+# No `examples:`, still deliberately. The spec's rule is that a steer follows a pinned defect,
+# never a hunch, and a steer on a parent type would render for every product beneath it.
 
 - name: CustomerAccount
   userAnchor: false
   description: >-
-    A company the business sells to or hopes to, as its CRM knows it. The CRM is the record
-    of who the accounts ARE; support and billing each know some of the same companies by
-    other means, and a company billing knows that the CRM does not is a finding, not an error.
+    A company we sell to or hope to: ONE node per company, whichever of CRM, helpdesk and billing
+    knows it, identified by accountKey, its registrable domain in lower case ('acme.com').
+    Near-named companies are DISTINCT accounts: 'Acme', 'Acme AB' and 'Acme Group' each have
+    their own domain. Match a name exactly.
+    From an account, TRACKED_AS reaches the CRM's record of it (CrmAccount), HAS_CASE its support
+    cases (SupportCase) and BILLED_AS its billing customer (BillingCustomer). It is a spine, not a
+    record: each system's record of the company keys it by the domain it holds (a website, an
+    email address), normalized one way for every system, so three records about one company are
+    one account and two companies with similar names are two. A company the CRM does not know
+    but billing or support does is an account too, with the CRM's fields empty — a finding, not
+    an error. One account's open cases, asked of the helpdesk for that domain alone:
+    `MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:HAS_CASE]->(c:SupportCase) WHERE
+    c.status = 'open' RETURN c.subject, c.openedOn`. By name, exactly:
+    `MATCH (a:CustomerAccount) WHERE a.name = 'Acme AB' RETURN a.accountKey`.
   spine:
     key: accountKey
     identityProperties: [accountKey, website]
@@ -65,8 +84,8 @@
     require: hasDot
     exclude: freemail
   properties:
-    accountKey: "The company's registrable domain, lower case. The join key to everything else."
-    name: "The company's name as the CRM holds it."
+    accountKey: "The company's registrable domain, lower case ('acme.com'): the one key that joins its CRM record, support cases and billing customer. A different domain is a different company, however alike the names."
+    name: "The company's name as the CRM holds it (support's or billing's spelling when the CRM does not know it). Not unique and not a key: compare it exactly, because 'Acme' and 'Acme AB' are different accounts."
     website: "The company's website URL, from the CRM. Empty when no CRM record keys the account."
     industry: "Industry, in the CRM's own words. Empty when no CRM record keys the account."
     relationship: "customer, prospect or other — whether they pay us yet, as the CRM records it. Empty when no CRM record keys the account."
@@ -78,97 +97,120 @@
 - name: CrmAccount
   userAnchor: false
   description: >-
-    A company as the CRM knows it: its RECORD of a customer account, the way a BillingCustomer
-    is billing's. The account is the identity (one node, whoever knows it); this is one
-    system's entry for it, reached from the account by TRACKED_AS, and it is where the CRM's
-    own things hang: its opportunities, its contacts, what its people wrote down.
+    One CRM's RECORD of a company, prospects included, reached from its CustomerAccount by
+    TRACKED_AS. It carries no accountKey: reach it through the account. Its deals (HAS_OPPORTUNITY),
+    people (HAS_ACCOUNT_CONTACT) and notes (HAS_NOTE) hang here, and so does the group hierarchy:
+    SUBSIDIARY_OF up, HAS_SUBSIDIARY down.
+    The account is the identity (one node, whoever knows it); this is one system's entry for it,
+    the way a BillingCustomer is billing's. A parent company and its subsidiaries are separate
+    records and separate accounts, each with its own domain. One account's open deals:
+    `MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:TRACKED_AS]->(k:CrmAccount)-[:HAS_OPPORTUNITY]->(o:Opportunity)
+    WHERE o.status = 'open' RETURN o.title, o.amount, o.currency`.
   properties:
-    name: "The company's name as the CRM holds it."
-    website: "The company's website, as the CRM holds it."
+    name: "The company's name as the CRM holds it. Compare it exactly: near-named companies are different records."
+    website: "The company's website, as the CRM holds it. Its domain is the account's accountKey."
     sourceUrl: "Opens this account in the CRM."
 
 - name: AccountContact
   userAnchor: false
   description: >-
-    A person at a customer account, as the CRM knows them. The same person may file support
-    cases under the same email address; email is how the two are recognized as one.
+    A person at a customer company as the CRM knows them, reached from a CrmAccount by
+    HAS_ACCOUNT_CONTACT. email, lower case, is how the same person is recognized when they file
+    a support case (SupportCase.requesterEmail); accountKey is their company's domain.
   properties:
     email: "Email address, lower case. How a contact is matched to a support requester."
     name: "Full name."
     jobTitle: "Job title."
-    accountKey: "The account this person belongs to."
+    accountKey: "The domain of the company this person belongs to; the CustomerAccount's key."
     sourceUrl: "Opens this contact in the CRM."
 
 - name: AccountNote
   userAnchor: false
   description: >-
-    Something our own people wrote down about an account, a contact or an opportunity: a
-    call summary, a worry, a plan. Notes are what the CRM BELIEVES, which is why they matter:
-    a problem support can see and no note mentions is a problem sales does not know about.
+    Something our own people wrote in the CRM about a company, a person or a deal, reached by
+    HAS_NOTE from a CrmAccount, an AccountContact or an Opportunity. writtenOn is the day it was
+    written (YYYY-MM-DD); body is plain text. Notes are what sales BELIEVES about a customer.
+    That is why they matter: a problem support can see and no note mentions is a problem sales
+    does not know about. A company's notes are on all three, so a question about what sales knows
+    reads all three edges, not only the company's.
   properties:
-    accountKey: "The account the note is about, whichever record it was written on."
+    accountKey: "The domain of the account the note is about, whichever record it was written on."
     about: "account, contact or opportunity — what the note was attached to."
     body: "The note, as plain text."
     author: "Who wrote it."
-    writtenOn: "The day it was written."
+    writtenOn: "The day it was written, YYYY-MM-DD."
     sourceUrl: "Opens the record the note is on."
 
 - name: Opportunity
   userAnchor: false
   description: >-
-    A deal in the pipeline, open or decided. amount x probability is the weighted pipeline;
-    both are the CRM's own figures and are never recomputed here.
+    A deal with a company, reached from its CrmAccount by HAS_OPPORTUNITY. status is open, won or
+    lost. amount is in major units of `currency`: total per currency, never across currencies.
+    closeOn is the expected close date while open and the decision date once won or lost.
+    probability is a fraction, 0 to 1.
+    amount x probability is the weighted pipeline; both are the CRM's own figures and are never
+    recomputed here. stage is the CRM's own word for the pipeline step and differs between
+    businesses; status does not, so a question about open or won deals asks status.
   properties:
-    accountKey: "The account the deal is with."
+    accountKey: "The domain of the account the deal is with."
     title: "The deal's name."
     stage: "The pipeline step, in the CRM's own words. Steps differ between businesses; status does not."
     status: "open, won or lost."
-    amount: { type: float, description: "Deal value, in major units of `currency`." }
-    currency: "ISO 4217 code."
+    amount: { type: float, description: "Deal value, in major units of `currency` (dollars, not cents). Unweighted: multiply by probability for the weighted figure. Sum per currency, never across." }
+    currency: "ISO 4217 code of `amount`."
     probability: { type: float, description: "0 to 1. A fraction, not a percentage." }
-    closeOn: "Expected close date while open; the day it was decided once won or lost."
+    closeOn: "YYYY-MM-DD. The expected close date while the deal is open; the day it was won or lost once decided."
     ownerName: "The salesperson who owns the deal."
     sourceUrl: "Opens this deal in the CRM."
 
 - name: FollowUp
   userAnchor: false
   description: >-
-    Something one of our people has scheduled to do about a customer: a call to make, an email to
-    send, a to-do with a date. An account with a follow-up on it is one somebody has picked up; an
-    account in trouble with none is one nobody has. Reached from what it is about by FOLLOW_UP_ON.
+    Something one of our people scheduled to do about a customer — a call, an email, a to-do —
+    reached by FOLLOW_UP_ON to the CrmAccount it is about. dueOn is the day it is due
+    (YYYY-MM-DD). An account in trouble with a follow-up is one somebody has picked up; with none,
+    nobody has.
   properties:
     title: "What is to be done, in the words of whoever scheduled it."
-    dueOn: "The day it is due."
+    dueOn: "The day it is due, YYYY-MM-DD."
     ownerName: "Who on our side is to do it."
     sourceUrl: "Opens this follow-up in the CRM."
 
 - name: Meeting
   userAnchor: false
   description: >-
-    A meeting on our calendar with people at a customer: a call, a review, a visit. Reached by
-    MEETING_WITH to the companies and people attending.
+    A meeting on our calendar with people at a customer — a call, a review, a visit — reached by
+    MEETING_WITH to the CRM records of those attending. startsOn is the day it starts (YYYY-MM-DD).
+    A meeting with only a person at a company reaches that person's record, not the company's.
   properties:
     title: "The meeting's subject."
-    startsOn: "The day it starts."
+    startsOn: "The day it starts, YYYY-MM-DD."
     sourceUrl: "Opens this meeting in the calendar it is kept in."
 
 - name: SupportCase
   userAnchor: false
   description: >-
-    One problem, question or request a customer brought to support — a ticket in a ticketing
-    product, a conversation in an inbox product. It is a case when a customer is waiting on
-    it; internal engineering work with no customer behind it is not one.
+    One problem, question or request a customer brought to support, reached from its
+    CustomerAccount by HAS_CASE; it carries accountKey too. status is open (waiting on us),
+    pending (waiting on the customer) or resolved. openedOn is when the customer raised it,
+    updatedOn the last activity, closedOn when resolved.
+    All three dates are YYYY-MM-DD. A ticket in a ticketing product and a conversation in an
+    inbox product are both cases; internal engineering work with no customer behind it is not
+    one. priority is urgent, high, medium, low or none — "urgent" alone is priority = 'urgent',
+    and urgent-or-high is the usual escalation count. One account's open cases:
+    `MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:HAS_CASE]->(c:SupportCase) WHERE
+    c.status = 'open' RETURN c.subject, c.priority, c.openedOn`.
   properties:
-    accountKey: "The requester's company, from their email domain."
+    accountKey: "The requester's company domain; the CustomerAccount's key."
     subject: "One line saying what the case is about."
-    status: "open, pending or resolved. Pending means waiting on the customer, not on us."
+    status: "open, pending or resolved. Open means waiting on us; pending means waiting on the customer, not on us."
     priority: "urgent, high, medium, low or none."
     kind: "bug, feature-request, question, documentation or enhancement, where the helpdesk records it."
     requesterEmail: "Who asked. Matches an AccountContact's email when the CRM knows them."
     requesterName: "Their name as support knows it."
-    openedOn: "The day the customer raised it."
-    updatedOn: "The day anything last happened on it."
-    closedOn: "The day it was resolved; empty while open."
+    openedOn: "The day the customer raised it, YYYY-MM-DD."
+    updatedOn: "The day anything last happened on it, YYYY-MM-DD."
+    closedOn: "The day it was resolved, YYYY-MM-DD; empty while open or pending."
     replyCount: { type: int, description: "How much back-and-forth there has been. A long thread on an open case is a signal in itself." }
     tags: { type: any, description: "The helpdesk's own tags or labels on the case, as a list of words. A desk that files cases by product area does it here, so two cases sharing a tag are about the same thing." }
     sourceUrl: "Opens this case in the helpdesk."
@@ -176,87 +218,103 @@
 - name: SupportMessage
   userAnchor: false
   description: >-
-    One message in a case's thread. Who said it matters more than anything else about it: a
-    customer's words are evidence of how they feel, an agent's are not.
+    One message in a support case's thread, reached from the SupportCase by HAS_MESSAGE.
+    fromCustomer says who wrote it: a customer's words are evidence of how they feel, our staff's
+    are not. internal marks a note between staff. sentOn is the day it was sent (YYYY-MM-DD).
   properties:
     body: "The message, as plain text."
     fromCustomer: { type: boolean, description: "True when the customer wrote it; false for our own staff." }
     internal: { type: boolean, description: "True for a private note between staff that the customer never saw." }
-    sentOn: "The day it was sent."
+    sentOn: "The day it was sent, YYYY-MM-DD."
 
 - name: BillingCustomer
   userAnchor: false
   description: >-
-    A company as the billing system knows it: somebody we invoice. Usually also a
-    CustomerAccount, joined on accountKey — and when it is not, that is worth knowing: a
-    paying or a delinquent customer the CRM has never heard of.
+    A company as the billing system knows it — somebody we invoice — reached from its
+    CustomerAccount by BILLED_AS. currency is the one ISO 4217 code it is billed in. A billing
+    customer whose account has no TRACKED_AS is a paying or owing company the CRM has never heard
+    of. Its invoices are HAS_INVOICE and its subscriptions HAS_SUBSCRIPTION.
   properties:
-    accountKey: "The company's registrable domain, from its billing email or website."
+    accountKey: "The company's registrable domain, from its billing email or website; the CustomerAccount's key."
     name: "The name invoices are made out to."
     email: "Where invoices are sent."
     currency: "The ISO 4217 currency this customer is billed in."
-    customerSince: "The day billing first knew them."
+    customerSince: "The day billing first knew them: YYYY-MM-DD, or a full ISO timestamp whose first ten characters are the day."
     sourceUrl: "Opens this customer in the billing system."
 
 - name: BillingSubscription
   userAnchor: false
   description: >-
-    Something a customer pays for on a schedule. The sum of a customer's active
-    subscriptions, annualized, is what the business stands to lose if they leave.
+    Something a billing customer pays for on a schedule, reached by HAS_SUBSCRIPTION from a
+    BillingCustomer. amount is the price per interval in major units of `currency`: total per
+    currency, never across, and never add a monthly to a yearly amount. periodEndsOn is the next
+    renewal.
+    The sum of a customer's active subscriptions, annualized, is what the business stands to lose
+    if they leave. A subscription renews every interval, not once: its renewals inside a span of
+    time are every period end in it.
   properties:
-    accountKey: "The customer's account."
+    accountKey: "The domain of the customer's account."
     product: "What is subscribed to."
     status: "active, past_due or canceled."
-    amount: { type: float, description: "Price per `interval`, in major units of `currency`." }
-    currency: "ISO 4217 code."
-    interval: "month or year."
-    startedOn: "The day the subscription began."
-    periodEndsOn: "The day the current paid period ends — the next renewal. It renews every `interval`, not once: its renewals in a span of time are every period end inside it, not only this one."
+    amount: { type: float, description: "Price per `interval`, in major units of `currency`. Sum per currency (and per interval), never across." }
+    currency: "ISO 4217 code of `amount`."
+    interval: "month or year: how long one paid period is."
+    startedOn: "The day the subscription began: YYYY-MM-DD, or a full ISO timestamp whose first ten characters are the day."
+    periodEndsOn: "The day the current paid period ends — the next renewal (YYYY-MM-DD, or a timestamp whose first ten characters are the day). It renews every `interval`, not once: its renewals in a span of time are every period end inside it, not only this one."
     sourceUrl: "Opens this subscription in the billing system."
 
 - name: BillingInvoice
   userAnchor: false
   description: >-
-    A bill sent to a customer. paymentStatus is the fact every billing product records and
-    the one to reason from: how many times a card was tried is detail some products keep
-    (see PaymentAttempt) and others do not.
+    A bill sent to a billing customer, reached by HAS_INVOICE from a BillingCustomer.
+    paymentStatus (pending, succeeded, failed) is the fact to reason from; what is still owed is
+    amount - amountPaid. Money is in major units of `currency`: sum per currency, never across.
+    issuedOn, dueOn and paidOn are YYYY-MM-DD.
+    How many times a card was tried is detail some billing products keep (see PaymentAttempt)
+    and others do not. Unpaid is paymentStatus <> 'succeeded', which includes invoices not yet
+    due; overdue is the due date passed with the invoice unpaid. One account's unpaid invoices:
+    `MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:BILLED_AS]->(b:BillingCustomer)-[:HAS_INVOICE]->(i:BillingInvoice)
+    WHERE i.paymentStatus <> 'succeeded' RETURN i.number, i.amount - i.amountPaid AS owed, i.currency, i.dueOn`.
   properties:
-    accountKey: "The customer's account."
+    accountKey: "The domain of the customer's account."
     number: "The invoice number printed on it."
     amount: { type: float, description: "Total billed, in major units of `currency`. Invoices can be in different currencies: sum amounts per currency (group by `currency`), never across them." }
-    amountPaid: { type: float, description: "How much of it has been received, in `currency`." }
-    currency: "ISO 4217 code."
-    paymentStatus: "pending, succeeded or failed. Failed means we tried to collect and could not."
+    amountPaid: { type: float, description: "How much of it has been received, in major units of `currency`. amount - amountPaid is what is still owed." }
+    currency: "ISO 4217 code of the amounts."
+    paymentStatus: "pending, succeeded or failed. Failed means we tried to collect and could not; pending includes invoices not yet due."
     overdue: { type: boolean, description: "True once the due date has passed with the invoice unpaid." }
     disputeLost: { type: boolean, description: "True when the customer disputed the payment with their bank and won." }
-    issuedOn: "The day it was issued."
-    dueOn: "The day payment is due."
-    paidOn: "The day it was paid; empty while unpaid."
+    issuedOn: "The day it was issued, YYYY-MM-DD."
+    dueOn: "The day payment is due, YYYY-MM-DD."
+    paidOn: "The day it was paid, YYYY-MM-DD; empty while unpaid."
     sourceUrl: "Opens this invoice in the billing system."
 
 - name: BillingPlan
   userAnchor: false
   description: >-
-    What a customer can be put on: a named price with a billing interval. A subscription is ON a
-    plan; the plan is where its name and how long one billing period lasts are kept.
+    What a subscription is on: a named price with a billing interval. amount is the base price
+    per billing period in major units of `currency`; compare and sum per currency, never across.
+    A subscription is ON a plan; the plan is where its name and how long one billing period lasts
+    are kept.
   properties:
     code: "The plan's code, as subscriptions name it."
     name: "The plan's name, as people say it."
     interval: "How often it bills: monthly, quarterly, yearly, weekly, in the billing product's own word."
     amount: { type: float, description: "Base price per billing period, in major units of `currency`." }
-    currency: "ISO 4217 code."
+    currency: "ISO 4217 code of `amount`."
 
 - name: PaymentAttempt
   userAnchor: false
   description: >-
-    One try at collecting an invoice: a card charge, a bank debit. A billing product connected
-    to a payment processor has these; one that is not may have none at all, so a rule about an
-    account's health should stand on BillingInvoice.paymentStatus and treat attempts as detail.
+    One try at collecting a BillingInvoice — a card charge, a bank debit — reached by HAS_ATTEMPT.
+    Some billing products record none, so judge an account's health on
+    BillingInvoice.paymentStatus and treat attempts as detail. attemptedOn is the day it was tried
+    (YYYY-MM-DD); amount is in major units of `currency`.
   properties:
-    accountKey: "The customer's account."
+    accountKey: "The domain of the customer's account."
     invoiceNumber: "The invoice this was an attempt to collect."
     amount: { type: float, description: "Amount attempted, in major units of `currency`." }
-    currency: "ISO 4217 code."
+    currency: "ISO 4217 code of `amount`."
     status: "succeeded or failed."
     failureCode: "Why it failed, in the processor's own words; empty on success."
-    attemptedOn: "The day it was tried."
+    attemptedOn: "The day it was tried, YYYY-MM-DD."

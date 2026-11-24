@@ -35,13 +35,83 @@ thing. It is stated in full at the top of `types/vocabulary.yml`; in short:
 | | |
 |---|---|
 | `accountKey` | the customer's registrable domain, lower case. The only cross-product join key. Empty when unknown; never a name or an id. |
-| money | major units as a number, `currency` beside it |
+| money | major units as a number, `currency` beside it; summed per currency, never across |
 | dates | ISO `YYYY-MM-DD`, and the BUSINESS date, not the row's creation time |
 | enumerations | exactly the listed words; a source with more states folds them in |
 | `sourceUrl` | opens this record in its own product |
 
 No parent has an identity. Identity is the child's, because only the product knows what
 makes its records unique, and two products' ids must never be compared.
+
+## One company, one account
+
+`CustomerAccount` is the one thing here that is not a record. A CRM's company, a helpdesk's
+requester company and a billing system's customer for one business are three records ABOUT one
+company, and the account is that company: one node, keyed by `accountKey`, its registrable domain
+in lower case. Each product realm puts `hub: CustomerAccount` on whichever field holds the
+company's domain or website, and the spine normalizes every value one way
+(`https://www.Acme.com/about`, `acme.com` and `billing@acme.com` are all `acme.com`), so no
+product realm normalizes on its own side.
+
+The key is the domain and never the name. **Companies with near names are distinct accounts**:
+`Acme`, `Acme AB` and `Acme Group` each have a domain of their own, and each is its own account
+with its own cases, invoices and deals. A group's parent and its subsidiaries are separate accounts
+too; the CRM's hierarchy between their records is `SUBSIDIARY_OF` / `HAS_SUBSIDIARY`. So a question
+about a company names it by `accountKey`, or by its name compared exactly — `a.name = 'Acme AB'`,
+never `CONTAINS 'Acme'`, which reads three companies as one.
+
+A company is an account once some system's realm has read a record keying it. An account that
+billing or support knows and the CRM does not has a key and perhaps a name, and the CRM's fields
+empty: that is a finding, not a gap.
+
+## Money, currency and dates
+
+| | |
+|---|---|
+| amounts | major units (dollars, not cents) of the `currency` beside them |
+| currency | ISO 4217. **Sum per currency, never across**: group by `currency`; a total that adds USD to GBP is not a number of anything |
+| subscription amounts | per `interval`; a monthly and a yearly amount are not added either |
+| `Opportunity.amount` | unweighted; `amount * probability` is the weighted pipeline |
+| owed | `BillingInvoice.amount - amountPaid`; unpaid is `paymentStatus <> 'succeeded'`, which includes invoices not yet due |
+
+| Date | Means |
+|---|---|
+| `SupportCase.openedOn` / `updatedOn` / `closedOn` | the customer raised it / anything last happened / it was resolved (empty while open or pending) |
+| `Opportunity.closeOn` | the expected close while open; the day it was won or lost once decided |
+| `BillingInvoice.issuedOn` / `dueOn` / `paidOn` | issued / payment due / paid (empty while unpaid) |
+| `BillingSubscription.startedOn` / `periodEndsOn` | began / the current paid period ends, which is the next renewal |
+| `BillingCustomer.customerSince` | billing first knew them |
+| `AccountNote.writtenOn`, `FollowUp.dueOn`, `Meeting.startsOn`, `SupportMessage.sentOn`, `PaymentAttempt.attemptedOn` | written / due / starts / sent / tried |
+
+Dates are `YYYY-MM-DD`. A source that only has a full ISO timestamp may pass it through; its first
+ten characters are the day, so compare on `substring(x, 0, 10)`.
+
+## Worked examples
+
+Each reads one account, by its domain, so each product is asked about that domain alone:
+
+```cypher
+// One account's open support cases
+MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:HAS_CASE]->(c:SupportCase)
+WHERE c.status = 'open'
+RETURN c.subject, c.priority, c.openedOn
+
+// What one account owes, per currency
+MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:BILLED_AS]->(:BillingCustomer)-[:HAS_INVOICE]->(i:BillingInvoice)
+WHERE i.paymentStatus <> 'succeeded'
+RETURN i.currency AS currency, sum(i.amount - i.amountPaid) AS owed, count(i) AS unpaidInvoices
+
+// One account's open deals, per currency
+MATCH (a:CustomerAccount {accountKey: 'acme.com'})-[:TRACKED_AS]->(:CrmAccount)-[:HAS_OPPORTUNITY]->(o:Opportunity)
+WHERE o.status = 'open'
+RETURN o.currency AS currency, sum(o.amount) AS openPipeline, collect(o.title) AS deals
+
+// A company by name: exactly, because near names are other companies
+MATCH (a:CustomerAccount) WHERE a.name = 'Acme AB'
+RETURN a.accountKey, a.name, a.website
+```
+
+A question about the whole book starts from a sweep instead; see "Reading a whole system" below.
 
 ## Relationship names
 
