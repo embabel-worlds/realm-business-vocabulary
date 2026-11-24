@@ -58,6 +58,8 @@ own joins, and uses these names so that a traversal reads the same over any prod
 | `Opportunity` | `HAS_NOTE` | `AccountNote` |
 | `FollowUp` | `FOLLOW_UP_ON` | `CrmAccount` |
 | `Meeting` | `MEETING_WITH` | `CrmAccount` |
+| `CrmAccount` | `SUBSIDIARY_OF` | `CrmAccount` |
+| `CrmAccount` | `HAS_SUBSIDIARY` | `CrmAccount` |
 | `CustomerAccount` | `HAS_CASE` | `SupportCase` |
 | `SupportCase` | `HAS_MESSAGE` | `SupportMessage` |
 | `CustomerAccount` | `BILLED_AS` | `BillingCustomer` |
@@ -68,6 +70,18 @@ own joins, and uses these names so that a traversal reads the same over any prod
 `HAS_ACCOUNT_CONTACT` and not `HAS_CONTACT`: the host already writes `HAS_CONTACT` when it
 resolves a record onto its Person spine, and a vocabulary that reuses a host relationship
 name for something else has made every traversal of it ambiguous.
+
+`SUBSIDIARY_OF` and `HAS_SUBSIDIARY` are the company hierarchy as the CRM records it: the
+parent company a company belongs to, and the companies filed under it. Every CRM keeps one —
+Odoo's parent company on a company record, Salesforce's Parent Account, HubSpot's parent
+company association — and a realm maps its own onto these two names, so "this company and its
+subsidiaries" is `(k:CrmAccount)-[:HAS_SUBSIDIARY*1..4]->(s:CrmAccount)` whichever CRM answers.
+Two names rather than one edge walked both ways, as FIBO does for control: a walk UP is one
+parent per hop and never asks, at each company it passes, for all of that company's siblings.
+They join CRM records, not `CustomerAccount`s: a group's companies are separate accounts with
+domains of their own, and each subsidiary reaches its own account the usual way, by its website.
+The edge joins companies only. A person's link to the company they work at is
+`HAS_ACCOUNT_CONTACT`, even where the CRM stores both in one field.
 
 ## Reading a whole system
 

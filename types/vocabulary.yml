@@ -73,6 +73,8 @@
     ownerName: "The person on our side who owns the relationship, by name, from the CRM. Empty when no CRM record keys the account."
     sourceUrl: "Opens this account in the CRM. Empty when no CRM record keys the account."
 
+# The CRM's company hierarchy hangs here, between records: (:CrmAccount)-[:SUBSIDIARY_OF]->(:CrmAccount)
+# up to the parent company, HAS_SUBSIDIARY down to the companies filed under it. See the README.
 - name: CrmAccount
   userAnchor: false
   description: >-
